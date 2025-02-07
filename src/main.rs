@@ -416,6 +416,11 @@ fn very_simple_simulator(tasks: &mut SetOfPeriodicTasks, core_process: &mut Core
     for machine in &mut tasks.machine {
         machine.tasks.sort_by_key(|task| task.period_of_task);
     }
+    
+    // Sort the tasks by period, to be Rate Monotonic
+    tasks.machine.iter_mut().for_each(|machine| {
+        machine.tasks.sort_by_key(|task| task.period_of_task);
+    });
 
     core_process.current_time = 0;
     while core_process.current_time <= 8000 {
