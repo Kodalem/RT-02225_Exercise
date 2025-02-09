@@ -1,4 +1,4 @@
-
+use colored::*;
 #[derive(Debug, Clone)]
 pub(crate) enum Deadline {
     Hard,
@@ -49,6 +49,19 @@ impl Compuation{
     fn failed(&mut self){
         self.status = JobStatus::Missed;
     }
+    
+    // Debug Print the computation details
+    pub(crate) fn debug_print(&self){
+        match self.status{
+            JobStatus::NotStarted => println!("         Status: {}", "Not Started".white()),
+            JobStatus::InProgress => println!("         Status: {}", "In Progress".yellow()),
+            JobStatus::Completed => println!("          Status: {}", "Completed".green()),
+            JobStatus::Missed => println!("         Status: {}", "Missed".red()),
+        }
+        println!("          Execution Time: {}", self.execution_time);
+        println!("          Completed Computation Time: {}", self.completed_compuation_time);
+    }
+    
 
 }
 
@@ -100,18 +113,40 @@ impl Job {
         self.computation.failed();
         self.computation.status = JobStatus::Missed;
         // Todo - Write notification to the user
+        self.panic_if_deadline_missed();
     }
-    
+    fn panic_if_deadline_missed(&self){
+        if self.computation.status == JobStatus::Missed{
+            panic!("Deadline missed for job: {}", self.id);
+        }
+    }
     pub(crate) fn advance_job_time(&mut self) {
         self.computation.do_computation();
     }
-    
-    
     pub(crate) fn check_deadline(&mut self, current_time: usize){
         if let Some(absolute_deadline) = self.absolute_deadline{
             if current_time >= absolute_deadline{
                 self.resolve_deadline();
             }
         }
+    }
+    // Debug print the job details
+    pub(crate) fn debug_print(&self){
+        println!("     Job ID: {}", self.id.to_string().cyan());
+        match self.deadline_type{
+            Deadline::Hard => println!("     Deadline Type: {}", "Hard".red()),
+            Deadline::Soft => println!("     Deadline Type: {}", "Soft".yellow()),
+            Deadline::Firm => println!("     Deadline Type: {}", "Firm".green()),
+        }
+        if let Some(absolute_deadline) = self.absolute_deadline {
+            println!("     Absolute Deadline: {}", absolute_deadline.to_string().magenta());
+        }
+        if let Some(release_time) = self.release_time {
+            println!("     Release Time: {}", release_time.to_string().yellow());
+        }
+        if let Some(instance) = self.instance {
+            println!("     Instance: {}", instance.to_string().green());
+        }
+        self.computation.debug_print();
     }
 }

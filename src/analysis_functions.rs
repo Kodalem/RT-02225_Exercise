@@ -1,11 +1,10 @@
 
 // Include the process.rs, job.rs, and task.rs files
 use crate::task::{Task};
-use crate::process::*;
 
 
 // Todo: Unwrangle the usize spaghetti
-fn response_time_analysis(tasks: &Vec<Task>) -> Vec<&Task> {
+pub(crate) fn response_time_analysis(tasks: &Vec<Task>) -> Vec<&Task> {
     let mut schedulable_tasks = Vec::new();
 
     for task in tasks {
