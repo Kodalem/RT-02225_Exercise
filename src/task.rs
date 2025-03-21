@@ -2,10 +2,11 @@ use crate::job::{Deadline, Job};
 use colored::*;
 use rand::Rng;
 
+#[derive(Debug)]
 pub(crate) struct Task {
     pub(crate) id: usize,                        // Unique identifier
     pub(crate) worst_case_execution_time: usize, // The worst case execution time of the task
-    best_case_execution_time: usize,             // The best case execution time of the task
+    pub(crate) best_case_execution_time: usize,             // The best case execution time of the task
     pub(crate) relative_deadline: usize,         // The relative deadline of the task
     pub(crate) period: usize,                    // The period of the task
     phase: usize,                                // The phase of the task
@@ -31,6 +32,7 @@ impl Task {
             jobs: None,
         }
     }
+    #[allow(dead_code)]
     fn get_job_by_id(&self, id: usize) -> Option<&Job> {
         // Check if the jobs list is empty
         if let Some(jobs) = &self.jobs {
@@ -39,6 +41,7 @@ impl Task {
         }
         None
     }
+    #[allow(dead_code)]
     fn get_job_by_instance(&self, instance: usize) -> Option<&Job> {
         // Check if the jobs list is empty
         if let Some(jobs) = &self.jobs {
@@ -56,7 +59,7 @@ impl Task {
             // Check if the job has an instanced into some order
             if let Some(instance) = job.instance {
                 // Set the absolute deadline for the job
-                job.set_absolute_deadline(self.phase + self.period * instance);
+                job.set_absolute_deadline(self.phase + self.period * (instance + 1));
             } else {
                 panic!("Job has been left uninstanced!")
             }
@@ -66,15 +69,33 @@ impl Task {
         // Check if the job has an instance into some order
         if let Some(instance) = job.instance {
             // Set the release time for the job
-            job.set_release_time(self.phase + self.period * (instance - 1));
+            // Todo: Create some better logic for this
+            job.set_release_time(self.phase + self.period * (instance - 0));
         } else {
             panic!("Job has been left uninstanced!")
         }
     }
 
     fn get_random_execution_time(&self) -> usize {
-        // Generate a random number between the worst case and best case execution time
-        rand::rng().random_range(self.best_case_execution_time..self.worst_case_execution_time)
+        // Handle case when BCET equals WCET
+        if self.best_case_execution_time == self.worst_case_execution_time {
+            return self.best_case_execution_time;
+        }
+        // Panic if BCET is greater than WCET
+        if self.best_case_execution_time > self.worst_case_execution_time {
+            // Debug print the task details
+            //self.debug_print(false);
+            panic!("Best Case Execution Time cannot be greater");
+        };
+
+        // Otherwise generate a random number between BCET and WCET
+        rand::rng().random_range(self.best_case_execution_time..=self.worst_case_execution_time)
+    }
+    // This function will create a random name for the job which is 4 characters long
+    pub(crate) fn generate_random_name (&self) -> String {
+        // Create a random string of 4 characters
+        let name: String = (0..4).map(|_| char::from(rand::rng().random_range(b'A'..=b'Z'))).collect();
+        name
     }
 
     pub(crate) fn randomly_generate_jobs(&mut self, num_jobs: usize) {
@@ -84,6 +105,8 @@ impl Task {
         for i in 1..num_jobs+1 {
             // Create a new job
             let mut job = Job::new(i, self.get_random_execution_time(), Deadline::Hard);
+            // Set the name of the job
+            job.set_name(self.generate_random_name());
             // Set the instance of the job
             job.set_instance(i);
             // Calculate the absolute deadline for the job
@@ -97,6 +120,7 @@ impl Task {
     }
 
     // Debug print the task details
+    #[allow(dead_code)]
     pub(crate) fn debug_print(&self, include_jobs: bool) {
         println!("  Task ID: {}", self.id.to_string().cyan());
         println!(

@@ -1,5 +1,6 @@
 use colored::*;
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) enum Deadline {
     Hard,
     Soft,
@@ -16,8 +17,8 @@ pub(crate) enum JobStatus{
 
 #[derive(Debug, Clone)]
 pub struct Compuation{
-    execution_time: usize, // Time it takes to execute the job
-    completed_compuation_time: usize, // Time it took to complete the job
+    pub(crate) execution_time: usize, // Time it takes to execute the job
+    pub(crate) completed_compuation_time: usize, // Time it took to complete the job
     pub(crate) status: JobStatus,
 }
 impl Compuation{
@@ -41,9 +42,14 @@ impl Compuation{
                 self.complete();
               }
         }
+           else if self.status == JobStatus::NotStarted{
+               panic!("The status has not started!");
+           }
         else {
             // Todo: Handle this error properly - Maybe do a soft fail
-            panic!("Cannot do computation on a job that is not in progress");
+            //panic!("Cannot do computation on a job that is not in progress");
+            // Set the status to missed
+            self.failed();
         }
     }
     fn failed(&mut self){
@@ -68,9 +74,10 @@ impl Compuation{
 #[derive(Debug, Clone)]
 pub(crate) struct Job {
     pub(crate) id: usize, // Unique identifier // Todo: Remove this? Replace with instance? UUID?
+    pub(crate) name: String, // Name of the job
     pub(crate) computation: Compuation, // The computation details
     deadline_type: Deadline, // The deadline for the job
-    absolute_deadline: Option<usize>, // The absolute deadline for the job
+    pub(crate) absolute_deadline: Option<usize>, // The absolute deadline for the job
     pub(crate) release_time: Option<usize>, // The release time for the job
     pub(crate) instance: Option<usize>, // The instance of the job
 }
@@ -78,6 +85,7 @@ impl Job {
     pub(crate) fn new(id: usize, execution_time: usize, deadline_type: Deadline) -> Self{
         Self{
             id,
+            name: "Job".to_string(),
             computation: Compuation::new(execution_time),
             deadline_type,
             absolute_deadline: None,
@@ -85,6 +93,10 @@ impl Job {
             instance: None,
         }
     }
+    pub(crate) fn set_name(&mut self , name: String){
+        self.name = name;
+    }
+    
     pub(crate) fn set_absolute_deadline(&mut self, absolute_deadline: usize){
         self.absolute_deadline = Some(absolute_deadline);
     }
@@ -97,9 +109,11 @@ impl Job {
     pub(crate) fn start(&mut self){
         self.computation.start();
     }
+    #[allow(dead_code)]
     fn complete(&mut self){
         self.computation.complete();
     }
+    #[allow(dead_code)]
     fn do_computation(&mut self){
         // Do computation if the job is in progress
         if self.computation.status == JobStatus::InProgress{
@@ -117,18 +131,21 @@ impl Job {
     }
     fn panic_if_deadline_missed(&self){
         if self.computation.status == JobStatus::Missed{
-            panic!("Deadline missed for job: {}", self.id);
+            // Todo: Implement notification system
+            //panic!("Deadline missed for job: {}", self.id);
         }
     }
     pub(crate) fn advance_job_time(&mut self) {
         self.computation.do_computation();
     }
-    pub(crate) fn check_deadline(&mut self, current_time: usize){
+    pub(crate) fn check_deadline(&mut self, current_time: usize) -> bool {
         if let Some(absolute_deadline) = self.absolute_deadline{
             if current_time >= absolute_deadline{
                 self.resolve_deadline();
+                return true;
             }
         }
+        false
     }
     // Debug print the job details
     pub(crate) fn debug_print(&self){

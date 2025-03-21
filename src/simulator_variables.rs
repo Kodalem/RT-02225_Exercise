@@ -16,15 +16,18 @@ struct SimulatorTime {
 }
 
 pub(crate) struct SimulatorVariables {
+    #[allow(dead_code)]
     number_of_tasks: usize, // The number of tasks in the system
-    number_of_tasks_per_cycle: usize, // The number of tasks that can be processed in a cycle, aka number of jobs within a task
+    pub(crate) number_of_tasks_per_cycle: usize, // The number of tasks that can be processed in a cycle, aka number of jobs within a task
     maximum_time_to_run: usize, // The maximum time the simulator can run for
     current_time: SimulatorTime, // The current time of the simulator
-    list_of_tasks: Option<Vec<Task>>, // The list of tasks in the system
+    pub(crate) list_of_tasks: Option<Vec<Task>>, // The list of tasks in the system
+    #[allow(dead_code)]
     maximum_job_time: usize, // The maximum time a job can run for
-    processor: Option<ProcessorUnit>, // Mono-processor system for now
-
+    pub(crate) processor: Option<ProcessorUnit>, // Mono-processor system for now
+    simulation_sleep: u128, // The sleep time for the simulation
     // Todo: Write randomizer booleans
+
 }
 
 
@@ -38,7 +41,20 @@ impl SimulatorVariables {
             list_of_tasks: None,
             maximum_job_time: 100,
             processor: None,
+            simulation_sleep: 100,
         }
+    }
+    
+    pub(crate) fn get_number_of_processor_units(&self) -> usize {
+        if let Some(_processor) = &self.processor {
+            return 1;
+        }
+        0
+    }
+
+    // Add a setter method for number_of_tasks_per_cycle
+    pub(crate) fn set_number_of_tasks_per_cycle(&mut self, number: usize) {
+        self.number_of_tasks_per_cycle = number;
     }
 
     // Set the list of tasks
@@ -46,55 +62,72 @@ impl SimulatorVariables {
         self.list_of_tasks = Some(list_of_tasks);
     }
     // Generate jobs for the tasks
-    pub(crate) fn generate_jobs(&mut self) {
+    pub(crate) fn generate_jobs(&mut self) -> Result<(), String> {
+        if self.number_of_tasks_per_cycle == 0 {
+            return Err("Number of tasks per cycle must be greater than 0".to_string());
+        }
+
         if let Some(tasks) = &mut self.list_of_tasks {
             for task in tasks.iter_mut() {
                 task.randomly_generate_jobs(self.number_of_tasks_per_cycle);
             }
+            Ok(())
+        } else {
+            Err("No tasks available to generate jobs".to_string())
         }
     }
     
     // Advance the time of the simulator
-    fn advance_time(&mut self) {
+    pub(crate) fn advance_time(&mut self) {
         self.current_time.time += 1;
     }
 
     // Return a job if the release time is equal to the current time
-    fn poll_jobs(&mut self) -> Option<Job> {
-        let job = None;
+    // Return all jobs with release time equal to the current time
+    pub(crate) fn poll_jobs(&mut self) -> Vec<Job> {
+        let mut jobs_to_release = Vec::new();
+
         if let Some(tasks) = &self.list_of_tasks {
             for task in tasks {
                 if let Some(jobs) = &task.jobs {
                     for job in jobs {
                         if let Some(release_time) = job.release_time {
                             if release_time == self.current_time.time as usize {
-                                return Some(job.clone());
+                                jobs_to_release.push(job.clone());
                             }
                         }
                     }
                 }
             }
         }
-        job
+
+        jobs_to_release
+    }
+
+    pub fn set_simulation_speed(&mut self, sleep_ms: u128) {
+        self.simulation_sleep = sleep_ms;
     }
 
     // Run the simulator
-    pub(crate) fn run(&mut self) {
-        
+    pub(crate) fn run(&mut self) -> bool {
         // Check if the simulator is ready to run
         if !self.is_ready() {
             panic!("Simulator is not ready to run!");
         }
-        
-        while self.current_time.time < self.maximum_time_to_run as u128 {
 
-            // Add a job to the processor from polling the jobs
-            if let Some(job) = self.poll_jobs() {
+        while self.current_time.time < self.maximum_time_to_run as u128 {
+            // Log current time
+            //println!("Current Time: {}", self.current_time.time);
+
+            // Add a job or jobs to the processor from polling the jobs
+            let released_jobs = self.poll_jobs();
+            if !released_jobs.is_empty() {
                 if let Some(processor) = &mut self.processor {
-                    processor.add_job(job);
-                }
-                // Panic if processor is not set
-                else {
+                    for job in released_jobs {
+                        //println!("Releasing Job: {} at Time: {}", job.id, self.current_time.time);
+                        processor.add_job(job);
+                    }
+                } else {
                     panic!("Processor not set!");
                 }
             }
@@ -106,9 +139,13 @@ impl SimulatorVariables {
 
             self.advance_time();
         }
+        // Make a dummy function call to attach debugger onto
+        //println!("Simulation finished!");
+        true
     }
 
     // Randomly generate a list of tasks, making sure that WCET is greater than BCET
+    #[allow(dead_code)]
     fn generate_tasks(&self, rand_range: usize) -> Vec<Task> {
         let mut tasks = Vec::new();
         let mut rng = rand::rng();
@@ -128,9 +165,9 @@ impl SimulatorVariables {
     pub(crate) fn setup_processor(&mut self, id: usize, clock_period: usize) {
         self.processor = Some(ProcessorUnit::new(id, clock_period));
         // Debug print the processor
-        if let Some(processor) = &self.processor {
-            processor.debug_print(true, true);
-        }
+        //if let Some(processor) = &self.processor {
+            //processor.debug_print(true, true);
+        //}
     }
 
     // Check if the list of tasks are schedulable by RT analysis
@@ -141,11 +178,11 @@ impl SimulatorVariables {
                 return true;
             }
             // Print the tasks that are schedulable
-            for task in schedulable_tasks {
-                println!("Task {} is schedulable", task.id);
-                // Debug print the task
-                task.debug_print(true);
-            }
+            //for task in schedulable_tasks {
+            //    println!("Task {} is schedulable", task.id);
+            //    // Debug print the task
+             //   task.debug_print(true);
+            //}
         }
         false
     }
@@ -180,6 +217,16 @@ impl SimulatorVariables {
                         println!("Task {} has no jobs!", task.id.to_string().red().bold());
                         return false;
                     }
+
+                    // Check if jobs have release times
+                    if let Some(jobs) = &task.jobs {
+                        for job in jobs {
+                            if job.release_time.is_none() {
+                                println!("Job in task {} has no release time!", task.id.to_string().red().bold());
+                                return false;
+                            }
+                        }
+                    }
                 }
                 return true;
             }
@@ -189,11 +236,12 @@ impl SimulatorVariables {
     }
 
 }
-
+#[allow(dead_code)]
 struct Simulator {
     variables: SimulatorVariables,
 }
 
+#[allow(dead_code)]
 impl Simulator {
     fn new(number_of_tasks: usize, number_of_tasks_per_cycle: usize, maximum_time_to_run: usize) -> Self {
         let variables = SimulatorVariables::new(number_of_tasks, number_of_tasks_per_cycle, maximum_time_to_run);

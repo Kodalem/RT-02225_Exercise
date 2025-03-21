@@ -3,7 +3,8 @@
 use crate::task::{Task};
 
 
-// Todo: Unwrangle the usize spaghetti
+//#[derive(Clone)]
+//Todo: Unwrangle the usize spaghetti
 pub(crate) fn response_time_analysis(tasks: &Vec<Task>) -> Vec<&Task> {
     let mut schedulable_tasks = Vec::new();
 
@@ -39,7 +40,7 @@ pub(crate) fn response_time_analysis(tasks: &Vec<Task>) -> Vec<&Task> {
         }
 
         if longest_response_time_at_critical_instant <= task.relative_deadline {
-            schedulable_tasks.push(task.clone()); // Task is schedulable, add to the list
+            schedulable_tasks.push(task); // Task is schedulable, add to the list
         }
     }
 
